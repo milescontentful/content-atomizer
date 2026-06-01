@@ -1,0 +1,21 @@
+# dependencies
+node_modules/
+dist/
+
+# env / secrets
+.env
+.env.local
+*.local
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# pipeline staging artifacts (keep the folders, ignore generated JSON)
+pipeline/staging/**/*.json
+
+# OS / editor
+.DS_Store
+*.log

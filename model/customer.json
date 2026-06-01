@@ -1,0 +1,10 @@
+{
+  "name": "Customer",
+  "id": "customer",
+  "fields": [
+    { "id": "atomKey", "type": "Symbol", "required": true, "unique": true },
+    { "id": "name", "type": "Symbol", "required": true },
+    { "id": "industry", "type": "Symbol" },
+    { "id": "region", "type": "Symbol" }
+  ]
+}

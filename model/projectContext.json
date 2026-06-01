@@ -1,0 +1,59 @@
+{
+  "name": "Project Context",
+  "id": "projectContext",
+  "displayField": "contextKey",
+  "description": "Context-as-content entry: brand voice, tone guides, ICP, guardrails, messaging pillars. Conditions the Transform stage. Status is native Contentful publish state.",
+  "fields": [
+    { "id": "contextKey", "name": "Context Key", "type": "Symbol", "required": true, "localized": false, "validations": [{ "unique": true }] },
+    {
+      "id": "contextType",
+      "name": "Context Type",
+      "type": "Symbol",
+      "required": true,
+      "localized": false,
+      "validations": [
+        {
+          "in": [
+            "brand_voice",
+            "tone_guide",
+            "project_brief",
+            "icp",
+            "competitive_positioning",
+            "compliance_guardrail",
+            "glossary",
+            "messaging_pillar",
+            "style_rules"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "format",
+      "name": "Format",
+      "type": "Symbol",
+      "required": false,
+      "localized": false,
+      "validations": [{ "in": ["markdown", "json"] }],
+      "defaultValue": { "en-US": "markdown" }
+    },
+    { "id": "body", "name": "Body", "type": "Text", "required": true, "localized": false },
+    {
+      "id": "scope",
+      "name": "Scope",
+      "type": "Symbol",
+      "required": false,
+      "localized": false,
+      "validations": [{ "in": ["space", "collection", "project", "source_document"] }],
+      "defaultValue": { "en-US": "space" }
+    },
+    {
+      "id": "appliesTo",
+      "name": "Applies To",
+      "type": "Array",
+      "required": false,
+      "localized": false,
+      "items": { "type": "Link", "linkType": "Entry", "validations": [] }
+    },
+    { "id": "precedence", "name": "Precedence", "type": "Integer", "required": false, "localized": false, "defaultValue": { "en-US": 0 } }
+  ]
+}

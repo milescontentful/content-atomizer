@@ -1,0 +1,158 @@
+{
+  "_comment": "Regression anchor for Phase 3 Transform validation. Represents the expected output for Example-1 (the composite value slide) from the Contentful Personalization Modular Field Deck. Transform output must match this shape before scaling beyond one slide. Fields match the deployed corrected model: native proves/illustrates/contains refs; no status (native publish state gates retrieval); no provenanceClass (deferred to production); subtype carries provenance role where needed.",
+  "sourceDocument": {
+    "atomKey": "src-personalization-modular-field-deck-q2fy27",
+    "title": "Contentful Personalization — Modular Field Deck Q2FY27",
+    "sourceUrl": "https://docs.google.com/presentation/d/1lDdGqlqRABuSBfv5eW79aXlT3oIKiFeF5DPdLJzRDmw",
+    "sourceDocId": "gslides-1lDdGqlqRABuSBfv5eW79aXlT3oIKiFeF5DPdLJzRDmw",
+    "internalExternal": "internal",
+    "slideOrder": [
+      "atom-vp-section",
+      "atom-vp-convert",
+      "atom-vp-firstparty",
+      "atom-vp-flow",
+      "atom-vp-ai",
+      "atom-stat-kraftheinz",
+      "atom-stat-acetate",
+      "atom-stat-ruggable",
+      "atom-img-experiments"
+    ]
+  },
+  "atoms": [
+    {
+      "atomKey": "atom-vp-section",
+      "atomType": "value_proposition",
+      "subtype": "section",
+      "body": "Deliver relevant experiences that convert, without leaving Contentful",
+      "semanticSummary": "The overarching promise: deliver relevant, converting experiences without leaving the CMS.",
+      "contains": [
+        "atom-vp-convert",
+        "atom-vp-firstparty",
+        "atom-vp-flow",
+        "atom-vp-ai"
+      ],
+      "sourceDocument": "src-personalization-modular-field-deck-q2fy27",
+      "sourceSlideIndex": "[NEEDS REVIEW]",
+      "authorState": "complete"
+    },
+    {
+      "atomKey": "atom-vp-convert",
+      "atomType": "value_proposition",
+      "subtype": "sub",
+      "body": "Convert more visitors into customers — build audience segments and content variants that drive higher CTR and conversions",
+      "semanticSummary": "Personalization lifts CTR and conversion via audience segments and content variants.",
+      "sourceDocument": "src-personalization-modular-field-deck-q2fy27",
+      "sourceSlideIndex": "[NEEDS REVIEW]",
+      "authorState": "complete"
+    },
+    {
+      "atomKey": "atom-vp-firstparty",
+      "atomType": "value_proposition",
+      "subtype": "sub",
+      "body": "Your first-party data, finally working for you — define segments with any customer data by connecting CRM, CDP, or warehouse signals directly to content decisions",
+      "semanticSummary": "Activates first-party data (CRM/CDP/DWH) directly into content decisions.",
+      "sourceDocument": "src-personalization-modular-field-deck-q2fy27",
+      "sourceSlideIndex": "[NEEDS REVIEW]",
+      "authorState": "complete"
+    },
+    {
+      "atomKey": "atom-vp-flow",
+      "atomType": "value_proposition",
+      "subtype": "sub",
+      "body": "Built into your flow of work — personalize in the same Contentful workspace. No new tools, no dev tickets, no stitching",
+      "semanticSummary": "Personalization is native to Contentful with no new tools or developer dependency.",
+      "sourceDocument": "src-personalization-modular-field-deck-q2fy27",
+      "sourceSlideIndex": "[NEEDS REVIEW]",
+      "authorState": "complete"
+    },
+    {
+      "atomKey": "atom-vp-ai",
+      "atomType": "value_proposition",
+      "subtype": "sub",
+      "body": "Let AI surface what you would never find — AI is grounded in your actual content model and customer data, so suggestions are contextually accurate from day one",
+      "semanticSummary": "AI suggestions are grounded in the customer's own content model and data, accurate from day one.",
+      "sourceDocument": "src-personalization-modular-field-deck-q2fy27",
+      "sourceSlideIndex": "[NEEDS REVIEW]",
+      "authorState": "complete"
+    },
+    {
+      "atomKey": "atom-stat-kraftheinz",
+      "atomType": "proof",
+      "subtype": "customer_outcome",
+      "body": "78% increase in conversion rate by Kraft Heinz",
+      "metric": "78% increase in conversion rate (Kraft Heinz)",
+      "semanticSummary": "Kraft Heinz saw a 78% increase in conversion rate with Contentful Personalization.",
+      "proves": ["atom-vp-convert"],
+      "attributedTo": "customer-kraft-heinz",
+      "sourceDocument": "src-personalization-modular-field-deck-q2fy27",
+      "sourceSlideIndex": "[NEEDS REVIEW]",
+      "authorState": "complete"
+    },
+    {
+      "atomKey": "atom-stat-acetate",
+      "atomType": "proof",
+      "subtype": "customer_outcome",
+      "body": "87% higher CTR for Ace & Tate",
+      "metric": "87% higher CTR (Ace & Tate)",
+      "semanticSummary": "Ace & Tate saw 87% higher click-through rate with Contentful Personalization.",
+      "proves": ["atom-vp-convert"],
+      "attributedTo": "customer-ace-and-tate",
+      "sourceDocument": "src-personalization-modular-field-deck-q2fy27",
+      "sourceSlideIndex": "[NEEDS REVIEW]",
+      "authorState": "complete"
+    },
+    {
+      "atomKey": "atom-stat-ruggable",
+      "atomType": "proof",
+      "subtype": "customer_outcome",
+      "body": "Under 30 minutes for Ruggable to personalize experiences",
+      "metric": "<30min time-to-value (Ruggable)",
+      "semanticSummary": "Ruggable was personalizing experiences in under 30 minutes (fast time-to-value).",
+      "proves": ["atom-vp-flow"],
+      "attributedTo": "customer-ruggable",
+      "sourceDocument": "src-personalization-modular-field-deck-q2fy27",
+      "sourceSlideIndex": "[NEEDS REVIEW]",
+      "authorState": "complete"
+    },
+    {
+      "atomKey": "atom-img-experiments",
+      "atomType": "image",
+      "subtype": "screenshot",
+      "asset": "asset-experiments-dashboard",
+      "body": "Experiments dashboard screenshot",
+      "semanticSummary": "Screenshot of the Contentful Experiments dashboard listing experiments with status, audience, and performance metrics.",
+      "illustrates": ["atom-vp-convert", "atom-vp-flow"],
+      "sourceDocument": "src-personalization-modular-field-deck-q2fy27",
+      "sourceSlideIndex": "[NEEDS REVIEW]",
+      "authorState": "complete"
+    }
+  ],
+  "customers": [
+    {
+      "atomKey": "customer-kraft-heinz",
+      "name": "Kraft Heinz",
+      "industry": "CPG / Food & Beverage",
+      "region": "North America"
+    },
+    {
+      "atomKey": "customer-ace-and-tate",
+      "name": "Ace & Tate",
+      "industry": "Retail / Eyewear",
+      "region": "EMEA"
+    },
+    {
+      "atomKey": "customer-ruggable",
+      "name": "Ruggable",
+      "industry": "Retail / Home Goods",
+      "region": "North America"
+    }
+  ],
+  "reviewQueue": [
+    {
+      "atomKey": "src-personalization-modular-field-deck-q2fy27",
+      "field": "sourceSlideIndex",
+      "reason": "Confirm actual slide index in deck for all atoms",
+      "value": "[NEEDS REVIEW]"
+    }
+  ]
+}

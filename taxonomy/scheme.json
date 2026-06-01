@@ -1,0 +1,32 @@
+{
+  "dimensions": {
+    "persona": [
+      { "id": "marketing-leader", "label": "Marketing Leader" },
+      { "id": "digital-experience-buyer", "label": "Digital Experience Buyer" },
+      { "id": "developer", "label": "Developer" },
+      { "id": "content-editor", "label": "Content Editor" }
+    ],
+    "vertical": [
+      { "id": "retail", "label": "Retail" },
+      { "id": "cpg", "label": "CPG / Food & Beverage" },
+      { "id": "financial-services", "label": "Financial Services" },
+      { "id": "technology", "label": "Technology" }
+    ],
+    "journeyStage": [
+      { "id": "awareness", "label": "Awareness" },
+      { "id": "consideration", "label": "Consideration" },
+      { "id": "proposal", "label": "Proposal" },
+      { "id": "expansion", "label": "Expansion" }
+    ],
+    "product": [
+      { "id": "contentful-personalization", "label": "Contentful Personalization" },
+      { "id": "contentful-studio", "label": "Contentful Studio" },
+      { "id": "contentful-ai", "label": "Contentful AI" }
+    ],
+    "region": [
+      { "id": "north-america", "label": "North America" },
+      { "id": "emea", "label": "EMEA" },
+      { "id": "apac", "label": "APAC" }
+    ]
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "name": "Content Atom",
+  "id": "contentAtom",
+  "displayField": "atomKey",
+  "description": "One independently reusable idea. Body + semanticSummary make it self-contained. Native reference fields (proves/illustrates/contains) carry Level-3 relationship context. Lands in DRAFT always; a human publishes after review.",
+  "fields": [
+    { "id": "atomKey", "name": "Atom Key", "type": "Symbol", "required": true, "localized": false, "validations": [{ "unique": true }] },
+    {
+      "id": "atomType",
+      "name": "Atom Type",
+      "type": "Symbol",
+      "required": true,
+      "localized": false,
+      "validations": [
+        {
+          "in": [
+            "value_proposition",
+            "proof",
+            "quote",
+            "case_study",
+            "image",
+            "feature",
+            "process_step",
+            "cta",
+            "insight"
+          ]
+        }
+      ]
+    },
+    { "id": "subtype", "name": "Subtype", "type": "Symbol", "required": false, "localized": false },
+    { "id": "body", "name": "Body", "type": "Text", "required": true, "localized": false },
+    { "id": "semanticSummary", "name": "Semantic Summary", "type": "Text", "required": true, "localized": false },
+    { "id": "metric", "name": "Metric (stat + label fused)", "type": "Symbol", "required": false, "localized": false },
+    { "id": "asset", "name": "Asset", "type": "Link", "linkType": "Asset", "required": false, "localized": false },
+    {
+      "id": "proves",
+      "name": "Proves",
+      "type": "Array",
+      "required": false,
+      "localized": false,
+      "items": { "type": "Link", "linkType": "Entry", "validations": [{ "linkContentType": ["contentAtom"] }] }
+    },
+    {
+      "id": "illustrates",
+      "name": "Illustrates",
+      "type": "Array",
+      "required": false,
+      "localized": false,
+      "items": { "type": "Link", "linkType": "Entry", "validations": [{ "linkContentType": ["contentAtom"] }] }
+    },
+    {
+      "id": "contains",
+      "name": "Contains",
+      "type": "Array",
+      "required": false,
+      "localized": false,
+      "items": { "type": "Link", "linkType": "Entry", "validations": [{ "linkContentType": ["contentAtom"] }] }
+    },
+    { "id": "relatedTo", "name": "Related To (long-tail verbs)", "type": "Object", "required": false, "localized": false },
+    {
+      "id": "attributedTo",
+      "name": "Attributed To",
+      "type": "Link",
+      "linkType": "Entry",
+      "required": false,
+      "localized": false,
+      "validations": [{ "linkContentType": ["customer"] }]
+    },
+    {
+      "id": "sourceDocument",
+      "name": "Source Document",
+      "type": "Link",
+      "linkType": "Entry",
+      "required": false,
+      "localized": false,
+      "validations": [{ "linkContentType": ["sourceDocument"] }]
+    },
+    { "id": "sourceSlideIndex", "name": "Source Slide Index", "type": "Integer", "required": false, "localized": false },
+    {
+      "id": "authorState",
+      "name": "Author State",
+      "type": "Symbol",
+      "required": false,
+      "localized": false,
+      "validations": [{ "in": ["complete", "incomplete", "template"] }],
+      "defaultValue": { "en-US": "complete" }
+    }
+  ]
+}

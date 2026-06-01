@@ -1,0 +1,29 @@
+{
+  "name": "Source Document",
+  "id": "sourceDocument",
+  "displayField": "title",
+  "description": "Level-1 context carrier: the deck parent that every atom references. Holds narrative intent, original slide order, and internal/external governance. productLine and audience are classified via metadata.concepts (org taxonomy) rather than link fields.",
+  "fields": [
+    { "id": "title", "name": "Title", "type": "Symbol", "required": true, "localized": false },
+    { "id": "sourceUrl", "name": "Source URL", "type": "Symbol", "required": false, "localized": false },
+    { "id": "sourceDocId", "name": "Source Doc ID", "type": "Symbol", "required": true, "localized": false, "validations": [{ "unique": true }] },
+    {
+      "id": "internalExternal",
+      "name": "Internal / External",
+      "type": "Symbol",
+      "required": false,
+      "localized": false,
+      "validations": [{ "in": ["internal", "external"] }],
+      "defaultValue": { "en-US": "internal" }
+    },
+    { "id": "slideOrder", "name": "Slide Order", "type": "Object", "required": false, "localized": false },
+    {
+      "id": "atoms",
+      "name": "Atoms",
+      "type": "Array",
+      "required": false,
+      "localized": false,
+      "items": { "type": "Link", "linkType": "Entry", "validations": [{ "linkContentType": ["contentAtom"] }] }
+    }
+  ]
+}
