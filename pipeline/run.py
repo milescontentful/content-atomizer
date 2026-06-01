@@ -53,8 +53,11 @@ def main() -> None:
     p.add_argument("--deck-id", required=True, help="Short deck identifier, e.g. personalization-q2fy27")
     p.add_argument("--from-slide", type=int, default=None, help="First slide index to include (inclusive)")
     p.add_argument("--to-slide",   type=int, default=None, help="Last slide index to include (inclusive)")
-    p.add_argument("--mode", choices=["coarse", "llm"], default="coarse",
-                   help="'coarse' = deterministic (Phase 2); 'llm' = LLM extraction (Phase 3)")
+    p.add_argument("--mode", choices=["coarse", "smart", "llm"], default="smart",
+                   help="'smart' = stat-fusion + step detection (default); 'coarse' = 1-slide-1-atom; 'llm' = LLM/agent")
+    p.add_argument("--skip-transform", action="store_true", default=False,
+                   help="Skip transform — load whatever atoms JSON is already in staging/03_atoms/. "
+                        "Use this when the Cursor agent wrote the atoms file directly (agent-as-LLM pattern).")
     p.add_argument("--apply", action="store_true", default=False,
                    help="Write draft entries to Contentful. Without this flag only a dry-run manifest is produced.")
     args = p.parse_args()
@@ -71,15 +74,27 @@ def main() -> None:
     if args.from_slide is not None and args.to_slide is not None:
         slide_range = (args.from_slide, args.to_slide)
 
-    # ── Transform ─────────────────────────────────────────────────────────────
-    print(f"[T] transforming {deck_id}  mode={args.mode}" +
-          (f"  slides {slide_range[0]}-{slide_range[1]}" if slide_range else ""))
-    atoms_path = run_transform(str(ir_path), deck_id, slide_range=slide_range, mode=args.mode)
+    # ── Transform (or skip if agent already wrote the atoms file) ────────────
+    atoms_path_obj = STAGING / "03_atoms" / f"{deck_id}.json"
+
+    if args.skip_transform:
+        if not atoms_path_obj.exists():
+            print(f"[T] ERROR: --skip-transform set but atoms file not found: {atoms_path_obj}")
+            print("[T]   Write the atoms JSON first (e.g. via the slides-atomizer skill in Cursor)")
+            sys.exit(1)
+        atoms_path = str(atoms_path_obj)
+        print(f"[T] --skip-transform: using existing atoms file {atoms_path}")
+    else:
+        print(f"[T] transforming {deck_id}  mode={args.mode}" +
+              (f"  slides {slide_range[0]}-{slide_range[1]}" if slide_range else ""))
+        atoms_path = run_transform(str(ir_path), deck_id, slide_range=slide_range, mode=args.mode)
+        print(f"[T] → {atoms_path}")
+
     atoms_data = json.loads(Path(atoms_path).read_text())
     atom_count = len(atoms_data["atoms"])
+    customer_count = len(atoms_data.get("customers", []))
     review_count = len(atoms_data["reviewQueue"])
-    print(f"[T] → {atoms_path}")
-    print(f"[T]   {atom_count} atoms | {review_count} review-queue items")
+    print(f"[T]   {atom_count} atoms | {customer_count} customers | {review_count} review-queue items")
 
     # ── Build manifest (dry-run) ──────────────────────────────────────────────
     manifest_path = build_manifest(atoms_path, deck_id)

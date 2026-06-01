@@ -100,28 +100,54 @@ def _resolve_links(fields: dict, key_to_id: dict) -> dict:
 def apply_manifest_cma(manifest_path: str, client: "ContentfulClient") -> list:
     """Apply the manifest to Contentful via CMA. Idempotent; never publishes.
 
+    Two-pass strategy to handle forward references (e.g. a parent atom's
+    'contains' field references children that don't exist yet):
+      Pass 1 — upsert every entry without link/reference fields.
+               Builds key→entryId map as entries are created.
+      Pass 2 — update every entry that has relationship fields, now that
+               all target entry IDs are known.
+
     Returns a list of operation results: [{op, key, id, action}].
     """
     manifest = json.loads(Path(manifest_path).read_text())
     results = []
-    key_to_id: dict = {}  # manifest key → real Contentful entry ID (built as we go)
+    key_to_id: dict = {}
 
-    for op in manifest["operations"]:
-        if op["op"] == "uploadAsset":
-            result = client.upload_asset(
-                file_path=op["source"],
-                title=op["key"],
-            )
-            results.append({"op": "uploadAsset", "key": op["key"], **result})
+    upsert_ops = [op for op in manifest["operations"] if op["op"] == "upsert"]
+    asset_ops  = [op for op in manifest["operations"] if op["op"] == "uploadAsset"]
 
-        elif op["op"] == "upsert":
-            resolved = _resolve_links(op["fields"], key_to_id)
-            result = client.upsert_entry(
-                content_type=op["contentType"],
-                key=op["key"],
-                fields=resolved,
-            )
-            key_to_id[op["key"]] = result["id"]
-            results.append({"op": "upsert", "key": op["key"], **result})
+    # ── Asset uploads (no forward-ref issue) ──────────────────────────────────
+    for op in asset_ops:
+        result = client.upload_asset(file_path=op["source"], title=op["key"])
+        results.append({"op": "uploadAsset", "key": op["key"], **result})
+
+    # ── Pass 1: create / update entries without relationship fields ────────────
+    for op in upsert_ops:
+        fields_no_links = {k: v for k, v in op["fields"].items() if k not in _LINK_FIELDS}
+        result = client.upsert_entry(
+            content_type=op["contentType"],
+            key=op["key"],
+            fields=fields_no_links,
+        )
+        key_to_id[op["key"]] = result["id"]
+        results.append({"op": "upsert", "key": op["key"], **result})
+
+    # ── Pass 2: patch relationship fields now all entry IDs are known ──────────
+    for op in upsert_ops:
+        link_fields = {k: v for k, v in op["fields"].items() if k in _LINK_FIELDS and v}
+        if not link_fields:
+            continue
+        resolved = _resolve_links(link_fields, key_to_id)
+        # Only update if every link field resolved fully (no plain-string leftovers)
+        all_resolved = all(
+            not isinstance(v, str)
+            for v in (resolved.values() if not isinstance(resolved, list) else resolved)
+        )
+        client.upsert_entry(
+            content_type=op["contentType"],
+            key=op["key"],
+            fields={**{k: v for k, v in op["fields"].items() if k not in _LINK_FIELDS},
+                    **resolved},
+        )
 
     return results
