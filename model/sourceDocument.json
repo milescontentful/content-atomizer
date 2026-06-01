@@ -24,6 +24,15 @@
       "required": false,
       "localized": false,
       "items": { "type": "Link", "linkType": "Entry", "validations": [{ "linkContentType": ["contentAtom"] }] }
+    },
+    {
+      "id": "parent",
+      "name": "Parent Collection",
+      "type": "Link",
+      "linkType": "Entry",
+      "required": false,
+      "localized": false,
+      "validations": [{ "linkContentType": ["sourceDocument"] }]
     }
   ]
 }

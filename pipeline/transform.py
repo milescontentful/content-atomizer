@@ -2,25 +2,45 @@
 
 Three modes
 -----------
-  coarse  (Phase 2)  Deterministic: 1 slide → 1 atom. Proves Load works.
-  smart   (Phase 2+) Deterministic: stat fusion, process-step detection,
-                     customer attribution, contains edges. No LLM needed.
-                     Produces 80% of the quality an LLM would give.
-  llm     (Phase 3)  LLM extraction per ATOM_PROMPT. Wire LLM_API_KEY.
-                     Alternatively, invoke the slides-atomizer Cursor skill
-                     agentically and write the atoms JSON by hand — the
-                     agent IS the LLM for the POC (no API key required).
+  smart   (default)  Geometry-aware: uses shapes[].top/left from the IR to
+                     correctly associate stat numbers with their labels within
+                     the same visual card. Falls back to Pattern-A only when
+                     geometry is absent. Ambiguous pairings → [NEEDS REVIEW].
+  coarse             1 slide → 1 atom. Fastest way to prove the Load pipeline.
+  llm                LLM extraction per ATOM_PROMPT. Wire LLM_API_KEY.
 
 Agent-as-LLM pattern (recommended for POC without an LLM key)
 -------------------------------------------------------------
-  The slides-atomizer / relationship-mapper skills in skills/ are written
-  to run inside the Cursor agent chat. Invoke them there, let the agent
-  write staging/03_atoms/{deck}.json, then run:
+  The slides-atomizer skill in skills/ runs inside the Cursor agent chat.
+  Invoke it there, let the agent write staging/03_atoms/{deck}.json, then:
     python pipeline/run.py --deck-id <id> --skip-transform --apply
-  The --skip-transform flag (see run.py) bypasses this module entirely and
-  loads whatever atoms JSON is already on disk.
+  --skip-transform bypasses this module and loads whatever atoms are on disk.
+  This is the source-of-truth path for multi-idea slides requiring judgment.
 
-Output shape matches model/contentAtom.json (corrected):
+Stat fusion non-negotiable (Section 9.1)
+-----------------------------------------
+  A number without its label is NEVER its own atom.
+  "87%" alone is dead; "87% higher CTR for Ace & Tate" is reusable.
+
+  Two fusion strategies in order of preference:
+
+  1. Geometry-aware card detection (when shapes[] present — GAS v2 export):
+     Shapes are grouped into vertical "card columns" by left position
+     (|left_A - left_B| < COL_THRESHOLD). Within each column, a lone stat
+     line is fused with the label line(s) in the same column. This correctly
+     handles slides where labels and stats are in separate shape boxes
+     (e.g. label at top, big number below, or 3-column stat-card layout).
+     Ambiguous columns (multiple stats) → [NEEDS REVIEW].
+
+  2. Pattern A — textRuns fallback (when shapes[] absent — old GAS export):
+     A bare stat run immediately followed by a non-stat run in textRuns[].
+     DOM order makes the pairing unambiguous for this specific pattern.
+
+  Pattern B (index-based: N labels then N stats, paired by position) has
+  been REMOVED. It was the root cause of the proof-slide misattributions
+  (Ruggable=87%, Ace&Tate=78%, KraftHeinz=<30min — all three wrong).
+
+Output shape matches model/contentAtom.json:
   - no 'status' field (native publish state gates retrieval)
   - 'authorState' enum: complete | incomplete | template
   - native relationship fields (proves / illustrates / contains)
@@ -32,6 +52,11 @@ from pathlib import Path
 from typing import Literal, Optional, Tuple
 
 STAGING = Path(__file__).parent / "staging"
+
+# Geometry thresholds for card-column grouping (points, Google Slides coordinate space).
+# A standard Slides canvas is 720×540pt; 3 equal columns → ~240pt wide each.
+# Shapes within COL_THRESHOLD horizontal distance share a "card column".
+COL_THRESHOLD = 100
 
 # ─── LLM prompt (Phase 3) ────────────────────────────────────────────────────
 
@@ -87,18 +112,22 @@ def _is_bare_stat(text: str) -> bool:
 
 
 def _fuse_stat_pairs(runs: list) -> Tuple[list, list]:
-    """Scan text runs and fuse bare-stat lines with their labels.
+    """Scan textRuns and fuse bare-stat lines with their labels (Pattern A only).
 
-    Handles two patterns found in real decks:
-      Pattern A (stat → label): "70%\\nof marketers say..."
-        → "70% of marketers say..."  (unambiguous, always correct)
-      Pattern B (label-block → stat-block, same count ≥ 2):
-        "higher CTR for Ace & Tate\\n78%\\n87%\\n..."
-        → pairs by DOM index order (may need visual review — flagged)
+    Pattern A (stat immediately followed by label in textRuns):
+      "70%\\nof marketers say..." → "70% of marketers say..."
+      Unambiguous because DOM order makes the adjacency clear.
+
+    Pattern B (index-based: N labels then N stats) has been REMOVED.
+    It produced wrong attributions on the proof slide because DOM reading
+    order differs from visual left-to-right layout order.
+
+    Use _fuse_stat_cards_geometry() when shapes[] geometry is available —
+    it correctly groups stats with labels by visual card column.
 
     Returns (items, review_items):
-      items: list of {'kind': 'stat'|'step'|'text', 'text': str, ['metric': str], ['step_num': int]}
-      review_items: list of {'reason': str, ...} for items needing human verification
+      items: list of {'kind': 'stat'|'step'|'text', 'text': str, ...}
+      review_items: list of {'reason': str, ...}
     """
     result = []
     review: list = []
@@ -111,45 +140,28 @@ def _fuse_stat_pairs(runs: list) -> Tuple[list, list]:
             i += 1
             continue
 
-        # ── Pattern A: stat immediately followed by a non-stat label ──────────
-        # This is unambiguous — the label directly follows the number in DOM order.
+        # Pattern A: stat immediately followed by a non-stat label (unambiguous)
         if _is_bare_stat(text) and i + 1 < n and not _is_bare_stat(runs[i + 1]):
             metric = f"{text} {runs[i + 1].strip()}"
             result.append({"kind": "stat", "text": metric, "metric": metric})
             i += 2
             continue
 
-        # ── Pattern B: contiguous label-block then stat-block of equal size ───
-        # Requires ≥ 2 stats to avoid false positives (single-stat case is
-        # handled by Pattern A on the next iteration). Flags for review because
-        # DOM order ≠ visual layout order — a human should verify the pairing.
-        if not _is_bare_stat(text):
-            j = i
-            while j < n and not _is_bare_stat(runs[j]):
-                j += 1
-            k = j
-            while k < n and _is_bare_stat(runs[k]):
-                k += 1
-            label_count = j - i
-            stat_count = k - j
+        # Bare stat with no immediately following label → flag, never guess
+        if _is_bare_stat(text):
+            marker = f"{text} [NEEDS REVIEW]"
+            result.append({"kind": "stat", "text": marker, "metric": marker})
+            review.append({
+                "reason": (
+                    f"Bare stat '{text}' has no immediately following label in textRuns. "
+                    "Re-export with GAS v2 for geometry-aware fusion, or review manually."
+                ),
+                "stat": text,
+            })
+            i += 1
+            continue
 
-            if 2 <= stat_count == label_count <= 5:
-                fused = []
-                for idx in range(stat_count):
-                    metric = f"{runs[j + idx].strip()} {runs[i + idx].strip()}"
-                    result.append({"kind": "stat", "text": metric, "metric": metric})
-                    fused.append(metric)
-                review.append({
-                    "reason": (
-                        "Pattern B stat fusion: DOM order may not match visual layout order. "
-                        "Verify each stat-label pairing is correct."
-                    ),
-                    "fusedMetrics": fused,
-                })
-                i = k
-                continue
-
-        # ── Numbered process step ──────────────────────────────────────────────
+        # Numbered process step
         m = _NUMBERED_STEP.match(text)
         if m:
             step_num = int(m.group(1))
@@ -165,6 +177,111 @@ def _fuse_stat_pairs(runs: list) -> Tuple[list, list]:
 
         result.append({"kind": "text", "text": text})
         i += 1
+
+    return result, review
+
+
+def _group_shapes_by_column(shapes: list) -> list:
+    """Group shapes into visual card columns by left position.
+
+    Two shapes are in the same column when |left_A - left_B| < COL_THRESHOLD.
+    Each column is sorted top-to-bottom. Columns are returned left-to-right.
+    """
+    if not shapes:
+        return []
+
+    sorted_shapes = sorted(shapes, key=lambda s: s.get("left", 0))
+    columns: list = []
+
+    for shape in sorted_shapes:
+        shape_left = shape.get("left", 0)
+        placed = False
+        for col in columns:
+            rep_left = col[0].get("left", 0)
+            if abs(shape_left - rep_left) < COL_THRESHOLD:
+                col.append(shape)
+                placed = True
+                break
+        if not placed:
+            columns.append([shape])
+
+    for col in columns:
+        col.sort(key=lambda s: s.get("top", 0))
+
+    return columns
+
+
+def _fuse_stat_cards_geometry(shapes: list) -> Tuple[list, list]:
+    """Geometry-aware stat + label fusion using shapes[] bounding boxes.
+
+    Groups shapes into visual card columns (by left position) then associates
+    each bare stat with the label line(s) in the same column. This is the
+    correct approach for stat-card slides where the label and number are in
+    separate visual boxes.
+
+    Ambiguous columns (multiple stats with no clear one-to-one label) →
+    [NEEDS REVIEW], never guessed.
+
+    Returns (items, review_items) in the same format as _fuse_stat_pairs().
+    """
+    result = []
+    review: list = []
+
+    columns = _group_shapes_by_column(shapes)
+
+    for col in columns:
+        col_lines: list = []
+        for shape in col:
+            for line in shape.get("lines", []):
+                text = (line.get("text") or "").strip()
+                if text:
+                    col_lines.append(text)
+
+        if not col_lines:
+            continue
+
+        stat_lines = [t for t in col_lines if _is_bare_stat(t)]
+        label_lines = [t for t in col_lines if not _is_bare_stat(t)]
+
+        if not stat_lines:
+            # No stats in this column — check for process steps, then emit as text
+            for text in col_lines:
+                m = _NUMBERED_STEP.match(text)
+                if m:
+                    step_num = int(m.group(1))
+                    step_label = m.group(2)
+                    result.append({"kind": "step", "text": step_label, "step_num": step_num})
+                else:
+                    result.append({"kind": "text", "text": text})
+            continue
+
+        if len(stat_lines) == 1:
+            if label_lines:
+                # Unambiguous: exactly one stat, one-or-more label lines in same column
+                label = " ".join(label_lines)
+                metric = f"{stat_lines[0]} {label}"
+                result.append({"kind": "stat", "text": metric, "metric": metric})
+            else:
+                # Stat with no label in its column — flag
+                marker = f"{stat_lines[0]} [NEEDS REVIEW]"
+                result.append({"kind": "stat", "text": marker, "metric": marker})
+                review.append({
+                    "reason": f"Bare stat '{stat_lines[0]}' has no label in its visual column.",
+                    "stat": stat_lines[0],
+                })
+        else:
+            # Multiple stats in same column → geometry ambiguous, flag all
+            for stat in stat_lines:
+                marker = f"{stat} [NEEDS REVIEW]"
+                result.append({"kind": "stat", "text": marker, "metric": marker})
+            review.append({
+                "reason": (
+                    "Multiple stats in the same visual column — cannot determine "
+                    "which label belongs to which stat. Verify manually."
+                ),
+                "stats": stat_lines,
+                "labels": label_lines,
+            })
 
     return result, review
 
@@ -186,6 +303,46 @@ def _slug(text: str, max_words: int = 5) -> str:
     clean = re.sub(r"[^a-z0-9\s]", "", text.lower())
     words = clean.split()[:max_words]
     return "-".join(w for w in words if w)
+
+
+# ─── Concept tagger (atom-tagger, Phase D) ────────────────────────────────────
+
+# Keyword → concept-ID mapping for the personalization deck.
+# Concepts are stored in the atom's relatedTo.concepts[] array (Object field).
+# productLine and audience are stored as concept IDs per the locked decision.
+_CONCEPT_RULES: list = [
+    # Product line
+    (re.compile(r'\bpersonali[sz]ation\b', re.I),   "product:contentful-personalization"),
+    (re.compile(r'\bexperiment',            re.I),   "product:contentful-personalization"),
+    (re.compile(r'\bA/B test',              re.I),   "product:contentful-personalization"),
+    (re.compile(r'\bai[\b\-]',              re.I),   "feature:ai"),
+    (re.compile(r'\bai native\b',           re.I),   "feature:ai"),
+    (re.compile(r'\bcdp\b',                 re.I),   "integration:cdp"),
+    (re.compile(r'\bcrm\b',                 re.I),   "integration:crm"),
+    (re.compile(r'\bcomposab',              re.I),   "architecture:composable"),
+    (re.compile(r'\bmach\b',                re.I),   "architecture:composable"),
+    # Audience / persona
+    (re.compile(r'\bmarketer',              re.I),   "persona:marketer"),
+    (re.compile(r'\bmarketing team',        re.I),   "persona:marketer"),
+    (re.compile(r'\bdeveloper',             re.I),   "persona:developer"),
+    (re.compile(r'\bdigital team',          re.I),   "persona:digital-team"),
+    # Vertical / use-case
+    (re.compile(r'\bretail\b',              re.I),   "vertical:retail"),
+    (re.compile(r'\bCPG\b',                re.I),   "vertical:cpg"),
+    (re.compile(r'\bfood.?bever',           re.I),   "vertical:cpg"),
+    (re.compile(r'\be.?comm',               re.I),   "vertical:ecommerce"),
+]
+
+
+def _tag_concepts(text: str) -> list:
+    """Return a deduplicated list of concept IDs that match the given text."""
+    concepts: list = []
+    seen: set = set()
+    for pattern, concept_id in _CONCEPT_RULES:
+        if pattern.search(text) and concept_id not in seen:
+            concepts.append(concept_id)
+            seen.add(concept_id)
+    return concepts
 
 
 # ─── Coarse transform (Phase 2) ───────────────────────────────────────────────
@@ -259,14 +416,18 @@ def transform_slide_smart(
 
     slide_idx = slide["slideIndex"]
     title = (slide.get("title") or "").strip()
-    # Use a short prefix of the sourceDocId so atomKeys are readable
     doc_pfx = source_doc_id.replace("gslides-", "")[:12]
 
-    runs = slide.get("textRuns", [])
-    # Remove runs that exactly duplicate the title
-    body_runs = [r for r in runs if r.strip() and r.strip() != title]
+    # Choose fusion strategy: geometry-aware when shapes[] present (GAS v2 export),
+    # otherwise fall back to Pattern-A-only textRuns fusion.
+    shapes = slide.get("shapes", [])
+    if shapes:
+        fused, fusion_review = _fuse_stat_cards_geometry(shapes)
+    else:
+        runs = slide.get("textRuns", [])
+        body_runs = [r for r in runs if r.strip() and r.strip() != title]
+        fused, fusion_review = _fuse_stat_pairs(body_runs)
 
-    fused, fusion_review = _fuse_stat_pairs(body_runs)
     review: list = [{"slideIndex": slide_idx, **r} for r in fusion_review]
     stats = [f for f in fused if f["kind"] == "stat"]
     steps = [f for f in fused if f["kind"] == "step"]
@@ -275,6 +436,9 @@ def transform_slide_smart(
     atoms: list = []
     new_customers: dict = {}
     edges: list = []
+
+    # vp_key computed early so proof atoms can reference it via proves[]
+    vp_key = f"{doc_pfx}-vp-{_slug(title)}" if title else None
 
     # ── Proof atoms (one per fused stat) ──────────────────────────────────────
     stat_atom_keys = []
@@ -291,6 +455,9 @@ def transform_slide_smart(
                 new_customers[company] = cslug
             attr_key = seen_customers[company]
 
+        full_text = f"{title} {metric}"
+        concepts = _tag_concepts(full_text)
+
         atom: dict = {
             "atomKey": akey,
             "atomType": "proof",
@@ -303,6 +470,10 @@ def transform_slide_smart(
         }
         if attr_key:
             atom["attributedTo"] = attr_key
+        if vp_key:
+            atom["proves"] = [vp_key]
+        if concepts:
+            atom["relatedTo"] = {"concepts": concepts}
 
         atoms.append(atom)
         stat_atom_keys.append(akey)
@@ -329,21 +500,30 @@ def transform_slide_smart(
 
     # ── Parent value_prop atom ─────────────────────────────────────────────────
     if title:
-        vp_key = f"{doc_pfx}-vp-{_slug(title)}"
         author_state = "incomplete" if slide["flags"].get("internal") else "complete"
 
-        # For non-stat/non-step slides, include remaining text in body
+        # For non-stat/non-step slides, include body text in the value_prop.
+        # Prefer shapes[] text (GAS v2) over flat textRuns for correct reading order.
         if not stats and not steps and texts:
             body_text = title + "\n" + "\n".join(t["text"] for t in texts)
+        elif not stats and not steps and not shapes:
+            runs_fb = slide.get("textRuns", [])
+            body_runs_fb = [r for r in runs_fb if r.strip() and r.strip() != title]
+            body_text = title + ("\n" + "\n".join(body_runs_fb) if body_runs_fb else "")
         else:
             body_text = title
 
-        # Summary: first meaningful sentence (≤160 chars)
         summary = title.split("\n")[0][:160]
+        vp_concepts = _tag_concepts(body_text)
 
+        parent_type = (
+            "value_proposition"
+            if stats or steps
+            else _atom_type_from_slide(slide)
+        )
         vp_atom: dict = {
             "atomKey": vp_key,
-            "atomType": _atom_type_from_slide(slide),
+            "atomType": parent_type,
             "body": body_text,
             "semanticSummary": summary,
             "sourceDocument": source_doc_id,
@@ -354,8 +534,39 @@ def transform_slide_smart(
         child_keys = stat_atom_keys + step_atom_keys
         if child_keys:
             vp_atom["contains"] = child_keys
+        if vp_concepts:
+            vp_atom["relatedTo"] = {"concepts": vp_concepts}
 
         atoms.insert(0, vp_atom)
+
+    # ── Image atoms from imageRefs[] (GAS v2 export — image-describer) ────────
+    image_atom_keys = []
+    for img in slide.get("imageRefs", []):
+        img_key = f"{doc_pfx}-img-s{slide_idx}-{img.get('objectId', 'x')[-6:]}"
+        alt = (img.get("altText") or "").strip()
+        if not alt:
+            alt = f"Image on slide {slide_idx} [NEEDS REVIEW]"
+            img_review_state = "incomplete"
+        else:
+            img_review_state = "complete"
+
+        img_atom: dict = {
+            "atomKey": img_key,
+            "atomType": "image",
+            "body": alt,
+            "semanticSummary": f"Slide {slide_idx} image: {alt[:120]}",
+            "sourceDocument": source_doc_id,
+            "sourceSlideIndex": slide_idx,
+            "authorState": img_review_state,
+        }
+        if vp_key:
+            img_atom["illustrates"] = [vp_key]
+        img_concepts = _tag_concepts(alt)
+        if img_concepts:
+            img_atom["relatedTo"] = {"concepts": img_concepts}
+
+        atoms.append(img_atom)
+        image_atom_keys.append(img_key)
 
     # ── Customer entries (deduplicated) ────────────────────────────────────────
     customer_list = [
@@ -367,7 +578,8 @@ def transform_slide_smart(
     dq = slide.get("notes", {}).get("Discovery Questions", "").strip()
     if dq:
         dq_key = f"{doc_pfx}-dq-s{slide_idx}"
-        atoms.append({
+        dq_concepts = _tag_concepts(dq)
+        dq_atom: dict = {
             "atomKey": dq_key,
             "atomType": "insight",
             "subtype": "discovery_question",
@@ -376,7 +588,10 @@ def transform_slide_smart(
             "sourceDocument": source_doc_id,
             "sourceSlideIndex": slide_idx,
             "authorState": "complete",
-        })
+        }
+        if dq_concepts:
+            dq_atom["relatedTo"] = {"concepts": dq_concepts}
+        atoms.append(dq_atom)
 
     return {"atoms": atoms, "edges": edges, "customers": customer_list, "reviewQueue": review}
 

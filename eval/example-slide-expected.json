@@ -1,144 +1,100 @@
 {
-  "_comment": "Regression anchor for Phase 3 Transform validation. Represents the expected output for Example-1 (the composite value slide) from the Contentful Personalization Modular Field Deck. Transform output must match this shape before scaling beyond one slide. Fields match the deployed corrected model: native proves/illustrates/contains refs; no status (native publish state gates retrieval); no provenanceClass (deferred to production); subtype carries provenance role where needed.",
+  "_comment": [
+    "Regression anchor for the geometry-aware transform (Phase C).",
+    "Source: Slide 4 ('Personalization') from the exportable copy 1lrMk of",
+    "  'Copy of [TEMPLATE] Contentful Personalization | Modular Field Deck | Q2FY27'",
+    "This slide is the canonical composite-value slide: title + 3 hero stats.",
+    "",
+    "NON-NEGOTIABLES enforced by the eval harness (scripts/eval.py):",
+    "  1. 87% is paired with Ace & Tate — never Ruggable or Kraft Heinz.",
+    "  2. 78% is paired with Kraft Heinz — never Ace & Tate or Ruggable.",
+    "  3. <30min is paired with Ruggable — never Ace & Tate or Kraft Heinz.",
+    "  4. No stat atom has metric '[NEEDS REVIEW]' (geometry fusion must succeed).",
+    "  5. All three stat atoms have a non-null attributedTo customer key.",
+    "",
+    "Pipeline stage coverage:",
+    "  'metric' and 'attributedTo' fields → validated after transform (smart mode)",
+    "  'proves' edges                     → validated after relationship-mapper (enrich step)",
+    "  'illustrates' edge on image atom   → validated after image-describer (enrich step)",
+    "",
+    "atomKey naming reflects what transform.py generates:",
+    "  doc_pfx = sourceDocId.replace('gslides-','')[:12] = '1lrMkceQwgnV'",
+    "  stat keys follow: {doc_pfx}-stat-{slug(metric, 5)}"
+  ],
   "sourceDocument": {
-    "atomKey": "src-personalization-modular-field-deck-q2fy27",
-    "title": "Contentful Personalization — Modular Field Deck Q2FY27",
-    "sourceUrl": "https://docs.google.com/presentation/d/1lDdGqlqRABuSBfv5eW79aXlT3oIKiFeF5DPdLJzRDmw",
-    "sourceDocId": "gslides-1lDdGqlqRABuSBfv5eW79aXlT3oIKiFeF5DPdLJzRDmw",
-    "internalExternal": "internal",
-    "slideOrder": [
-      "atom-vp-section",
-      "atom-vp-convert",
-      "atom-vp-firstparty",
-      "atom-vp-flow",
-      "atom-vp-ai",
-      "atom-stat-kraftheinz",
-      "atom-stat-acetate",
-      "atom-stat-ruggable",
-      "atom-img-experiments"
-    ]
+    "sourceDocId": "gslides-1lrMkceQwgnVKihu-LwzYD7qwLRsvDOZS47r4ukZFZF0",
+    "title": "Copy of [TEMPLATE] Contentful Personalization | Modular Field Deck | Q2FY27",
+    "sourceUrl": "https://docs.google.com/presentation/d/1lrMkceQwgnVKihu-LwzYD7qwLRsvDOZS47r4ukZFZF0",
+    "internalExternal": "internal"
   },
   "atoms": [
     {
-      "atomKey": "atom-vp-section",
+      "_note": "Parent value_prop for the slide. Contains the three proof atoms.",
+      "atomKey": "1lrMkceQwgnV-vp-personalization",
       "atomType": "value_proposition",
-      "subtype": "section",
-      "body": "Deliver relevant experiences that convert, without leaving Contentful",
-      "semanticSummary": "The overarching promise: deliver relevant, converting experiences without leaving the CMS.",
+      "body": "Personalization",
+      "semanticSummary": "Personalization",
       "contains": [
-        "atom-vp-convert",
-        "atom-vp-firstparty",
-        "atom-vp-flow",
-        "atom-vp-ai"
+        "1lrMkceQwgnV-stat-87-higher-ctr-for-ace",
+        "1lrMkceQwgnV-stat-78-increase-in-conversion-rate",
+        "1lrMkceQwgnV-stat-30min-for-ruggable-to"
       ],
-      "sourceDocument": "src-personalization-modular-field-deck-q2fy27",
-      "sourceSlideIndex": "[NEEDS REVIEW]",
+      "sourceDocument": "gslides-1lrMkceQwgnVKihu-LwzYD7qwLRsvDOZS47r4ukZFZF0",
+      "sourceSlideIndex": 4,
       "authorState": "complete"
     },
     {
-      "atomKey": "atom-vp-convert",
-      "atomType": "value_proposition",
-      "subtype": "sub",
-      "body": "Convert more visitors into customers — build audience segments and content variants that drive higher CTR and conversions",
-      "semanticSummary": "Personalization lifts CTR and conversion via audience segments and content variants.",
-      "sourceDocument": "src-personalization-modular-field-deck-q2fy27",
-      "sourceSlideIndex": "[NEEDS REVIEW]",
-      "authorState": "complete"
-    },
-    {
-      "atomKey": "atom-vp-firstparty",
-      "atomType": "value_proposition",
-      "subtype": "sub",
-      "body": "Your first-party data, finally working for you — define segments with any customer data by connecting CRM, CDP, or warehouse signals directly to content decisions",
-      "semanticSummary": "Activates first-party data (CRM/CDP/DWH) directly into content decisions.",
-      "sourceDocument": "src-personalization-modular-field-deck-q2fy27",
-      "sourceSlideIndex": "[NEEDS REVIEW]",
-      "authorState": "complete"
-    },
-    {
-      "atomKey": "atom-vp-flow",
-      "atomType": "value_proposition",
-      "subtype": "sub",
-      "body": "Built into your flow of work — personalize in the same Contentful workspace. No new tools, no dev tickets, no stitching",
-      "semanticSummary": "Personalization is native to Contentful with no new tools or developer dependency.",
-      "sourceDocument": "src-personalization-modular-field-deck-q2fy27",
-      "sourceSlideIndex": "[NEEDS REVIEW]",
-      "authorState": "complete"
-    },
-    {
-      "atomKey": "atom-vp-ai",
-      "atomType": "value_proposition",
-      "subtype": "sub",
-      "body": "Let AI surface what you would never find — AI is grounded in your actual content model and customer data, so suggestions are contextually accurate from day one",
-      "semanticSummary": "AI suggestions are grounded in the customer's own content model and data, accurate from day one.",
-      "sourceDocument": "src-personalization-modular-field-deck-q2fy27",
-      "sourceSlideIndex": "[NEEDS REVIEW]",
-      "authorState": "complete"
-    },
-    {
-      "atomKey": "atom-stat-kraftheinz",
+      "_note": "REQUIRED: 87% → Ace & Tate. This was WRONG in the old export (Pattern B bug).",
+      "atomKey": "1lrMkceQwgnV-stat-87-higher-ctr-for-ace",
       "atomType": "proof",
-      "subtype": "customer_outcome",
-      "body": "78% increase in conversion rate by Kraft Heinz",
-      "metric": "78% increase in conversion rate (Kraft Heinz)",
-      "semanticSummary": "Kraft Heinz saw a 78% increase in conversion rate with Contentful Personalization.",
-      "proves": ["atom-vp-convert"],
-      "attributedTo": "customer-kraft-heinz",
-      "sourceDocument": "src-personalization-modular-field-deck-q2fy27",
-      "sourceSlideIndex": "[NEEDS REVIEW]",
-      "authorState": "complete"
-    },
-    {
-      "atomKey": "atom-stat-acetate",
-      "atomType": "proof",
-      "subtype": "customer_outcome",
+      "metric": "87% higher CTR for Ace & Tate",
       "body": "87% higher CTR for Ace & Tate",
-      "metric": "87% higher CTR (Ace & Tate)",
-      "semanticSummary": "Ace & Tate saw 87% higher click-through rate with Contentful Personalization.",
-      "proves": ["atom-vp-convert"],
-      "attributedTo": "customer-ace-and-tate",
-      "sourceDocument": "src-personalization-modular-field-deck-q2fy27",
-      "sourceSlideIndex": "[NEEDS REVIEW]",
+      "semanticSummary": "Ace & Tate achieved 87% higher click-through rate using Contentful Personalization.",
+      "proves": ["1lrMkceQwgnV-vp-personalization"],
+      "attributedTo": "customer-ace-tate",
+      "sourceDocument": "gslides-1lrMkceQwgnVKihu-LwzYD7qwLRsvDOZS47r4ukZFZF0",
+      "sourceSlideIndex": 4,
       "authorState": "complete"
     },
     {
-      "atomKey": "atom-stat-ruggable",
+      "_note": "REQUIRED: 78% → Kraft Heinz. This was WRONG in the old export (Pattern B bug).",
+      "atomKey": "1lrMkceQwgnV-stat-78-increase-in-conversion-rate",
       "atomType": "proof",
-      "subtype": "customer_outcome",
-      "body": "Under 30 minutes for Ruggable to personalize experiences",
-      "metric": "<30min time-to-value (Ruggable)",
-      "semanticSummary": "Ruggable was personalizing experiences in under 30 minutes (fast time-to-value).",
-      "proves": ["atom-vp-flow"],
-      "attributedTo": "customer-ruggable",
-      "sourceDocument": "src-personalization-modular-field-deck-q2fy27",
-      "sourceSlideIndex": "[NEEDS REVIEW]",
+      "metric": "78% Increase in conversion rate  by Kraft Heinz",
+      "body": "78% Increase in conversion rate by Kraft Heinz",
+      "semanticSummary": "Kraft Heinz achieved a 78% increase in conversion rate using Contentful Personalization.",
+      "proves": ["1lrMkceQwgnV-vp-personalization"],
+      "attributedTo": "customer-kraft-heinz",
+      "sourceDocument": "gslides-1lrMkceQwgnVKihu-LwzYD7qwLRsvDOZS47r4ukZFZF0",
+      "sourceSlideIndex": 4,
       "authorState": "complete"
     },
     {
-      "atomKey": "atom-img-experiments",
-      "atomType": "image",
-      "subtype": "screenshot",
-      "asset": "asset-experiments-dashboard",
-      "body": "Experiments dashboard screenshot",
-      "semanticSummary": "Screenshot of the Contentful Experiments dashboard listing experiments with status, audience, and performance metrics.",
-      "illustrates": ["atom-vp-convert", "atom-vp-flow"],
-      "sourceDocument": "src-personalization-modular-field-deck-q2fy27",
-      "sourceSlideIndex": "[NEEDS REVIEW]",
+      "_note": "REQUIRED: <30min → Ruggable. This was WRONG in the old export (Pattern B bug).",
+      "atomKey": "1lrMkceQwgnV-stat-30min-for-ruggable-to",
+      "atomType": "proof",
+      "metric": "<30min for Ruggable to personalize experiences",
+      "body": "<30min for Ruggable to personalize experiences",
+      "semanticSummary": "Ruggable was able to personalize experiences in under 30 minutes with Contentful.",
+      "proves": ["1lrMkceQwgnV-vp-personalization"],
+      "attributedTo": "customer-ruggable",
+      "sourceDocument": "gslides-1lrMkceQwgnVKihu-LwzYD7qwLRsvDOZS47r4ukZFZF0",
+      "sourceSlideIndex": 4,
       "authorState": "complete"
     }
   ],
   "customers": [
     {
+      "atomKey": "customer-ace-tate",
+      "name": "Ace & Tate",
+      "industry": "Retail / Eyewear",
+      "region": "EMEA"
+    },
+    {
       "atomKey": "customer-kraft-heinz",
       "name": "Kraft Heinz",
       "industry": "CPG / Food & Beverage",
       "region": "North America"
-    },
-    {
-      "atomKey": "customer-ace-and-tate",
-      "name": "Ace & Tate",
-      "industry": "Retail / Eyewear",
-      "region": "EMEA"
     },
     {
       "atomKey": "customer-ruggable",
@@ -147,12 +103,15 @@
       "region": "North America"
     }
   ],
-  "reviewQueue": [
-    {
-      "atomKey": "src-personalization-modular-field-deck-q2fy27",
-      "field": "sourceSlideIndex",
-      "reason": "Confirm actual slide index in deck for all atoms",
-      "value": "[NEEDS REVIEW]"
-    }
-  ]
+  "reviewQueue": [],
+  "_evalRules": {
+    "statAttributionChecks": [
+      { "stat": "87%",    "mustContain": "Ace & Tate",   "mustNotContain": ["Ruggable", "Kraft Heinz"] },
+      { "stat": "78%",    "mustContain": "Kraft Heinz",  "mustNotContain": ["Ruggable", "Ace & Tate"]  },
+      { "stat": "<30min", "mustContain": "Ruggable",     "mustNotContain": ["Ace & Tate", "Kraft Heinz"] }
+    ],
+    "requiredAtomTypes": ["value_proposition", "proof", "proof", "proof"],
+    "noNeedsReviewInMetric": true,
+    "allProofsMustHaveAttributedTo": true
+  }
 }

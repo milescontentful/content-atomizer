@@ -27,6 +27,27 @@ interface BodyLine {
   isBullet: boolean;
 }
 
+/** One text shape with its bounding box — emitted by export-for-atomization.gs v2 */
+interface RawShape {
+  objectId: string;
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+  lines: BodyLine[];
+}
+
+/** One image element with its bounding box — emitted by export-for-atomization.gs v2 */
+interface RawImageRef {
+  objectId: string;
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+  altText: string;
+  contentUrl: string;
+}
+
 interface RawSlide {
   slideIndex: number;
   objectId: string;
@@ -36,6 +57,10 @@ interface RawSlide {
   subtitle?: string;
   bodyText: string;
   bodyLines: BodyLine[];
+  /** Per-shape geometry — present in exports from GAS v2 (export-for-atomization.gs) */
+  shapes?: RawShape[];
+  /** Per-image geometry — present in exports from GAS v2; replaces imageCount */
+  imageRefs?: RawImageRef[];
   speakerNotes: string;
   imageCount: number;
 }
@@ -62,6 +87,27 @@ interface SlideFlags {
   internal: boolean;
 }
 
+/** Geometry-aware shape in the IR — maps directly from GAS v2 shapes[] */
+interface IrShape {
+  objectId: string;
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+  lines: BodyLine[];
+}
+
+/** Image reference in the IR */
+interface IrImageRef {
+  objectId: string;
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+  altText: string;
+  contentUrl: string;
+}
+
 interface IrSlide {
   slideIndex: number;
   objectId: string;
@@ -69,8 +115,16 @@ interface IrSlide {
   slideType: string;
   title: string;
   subtitle?: string;
-  /** Flat ordered array of non-empty text runs from all shapes */
+  /** Flat ordered array of non-empty text runs (back-compat; used by coarse transform) */
   textRuns: string[];
+  /**
+   * Per-shape text + bounding box, sorted top-to-bottom then left-to-right.
+   * Present when the export was produced by GAS v2. The geometry-aware transform
+   * uses this to correctly pair stat numbers with their labels.
+   */
+  shapes: IrShape[];
+  /** Per-image geometry + altText. Use instead of imageCount for ingestion. */
+  imageRefs: IrImageRef[];
   imageCount: number;
   /** Speaker notes split into named sections */
   notes: ParsedNotes;
@@ -172,6 +226,29 @@ function buildTextRuns(slide: RawSlide): string[] {
 function buildIr(raw: RawDeck): IrDeck {
   const slides: IrSlide[] = raw.slides.map((s) => {
     const allText = [s.title, s.subtitle ?? '', s.bodyText, s.speakerNotes].join(' ');
+
+    // shapes[] — pass through directly from GAS v2 export; fall back to empty array
+    // for older exports (back-compat). The transform uses shapes for geometry-aware fusion.
+    const shapes: IrShape[] = (s.shapes ?? []).map((sh) => ({
+      objectId: sh.objectId,
+      top: sh.top,
+      left: sh.left,
+      width: sh.width,
+      height: sh.height,
+      lines: sh.lines,
+    }));
+
+    // imageRefs[] — pass through from GAS v2; fall back to empty array
+    const imageRefs: IrImageRef[] = (s.imageRefs ?? []).map((img) => ({
+      objectId: img.objectId,
+      top: img.top,
+      left: img.left,
+      width: img.width,
+      height: img.height,
+      altText: img.altText,
+      contentUrl: img.contentUrl,
+    }));
+
     const irSlide: IrSlide = {
       slideIndex: s.slideIndex,
       objectId: s.objectId,
@@ -179,7 +256,9 @@ function buildIr(raw: RawDeck): IrDeck {
       slideType: s.slideType,
       title: s.title,
       textRuns: buildTextRuns(s),
-      imageCount: s.imageCount ?? 0,
+      shapes,
+      imageRefs,
+      imageCount: imageRefs.length > 0 ? imageRefs.length : (s.imageCount ?? 0),
       notes: parseStructuredNotes(s.speakerNotes ?? ''),
       rawNotes: s.speakerNotes ?? '',
       flags: {
@@ -205,15 +284,22 @@ function summarize(ir: IrDeck): void {
   const total = ir.slides.length;
   const unfinished = ir.slides.filter((s) => s.flags.unfinished).length;
   const internal = ir.slides.filter((s) => s.flags.internal).length;
-  const withNotes = ir.slides.filter((s) => ir.slides[0] && Object.keys(s.notes).length > 0).length;
-  const withImages = ir.slides.filter((s) => s.imageCount > 0).length;
+  const withNotes = ir.slides.filter((s) => Object.keys(s.notes).length > 0).length;
   const withDQ = ir.slides.filter((s) => !!s.notes['Discovery Questions']).length;
+  const withImages = ir.slides.filter((s) => s.imageCount > 0).length;
+  const totalShapes = ir.slides.reduce((n, s) => n + s.shapes.length, 0);
+  const hasGeometry = ir.slides.some((s) => s.shapes.length > 0);
 
   console.log(`[extract] ${total} slides total`);
   console.log(`[extract]   ${unfinished} unfinished (will be skipped by transform)`);
   console.log(`[extract]   ${internal} internal`);
   console.log(`[extract]   ${withNotes} with structured notes | ${withDQ} with Discovery Questions`);
   console.log(`[extract]   ${withImages} with images`);
+  if (hasGeometry) {
+    console.log(`[extract]   ${totalShapes} shapes with geometry (GAS v2 export — geometry-aware fusion enabled)`);
+  } else {
+    console.log(`[extract]   no geometry data — re-export with updated export-for-atomization.gs for accurate stat fusion`);
+  }
 }
 
 // ─── CLI ──────────────────────────────────────────────────────────────────────

@@ -1,10 +1,12 @@
 {
   "name": "Customer",
   "id": "customer",
+  "displayField": "name",
+  "description": "A customer referenced by proof atoms via attributedTo. atomKey is a stable ID for delta upserts.",
   "fields": [
-    { "id": "atomKey", "type": "Symbol", "required": true, "unique": true },
-    { "id": "name", "type": "Symbol", "required": true },
-    { "id": "industry", "type": "Symbol" },
-    { "id": "region", "type": "Symbol" }
+    { "id": "atomKey", "name": "Atom Key", "type": "Symbol", "required": true, "localized": false, "validations": [{ "unique": true }] },
+    { "id": "name", "name": "Name", "type": "Symbol", "required": true, "localized": false },
+    { "id": "industry", "name": "Industry", "type": "Symbol", "required": false, "localized": false },
+    { "id": "region", "name": "Region", "type": "Symbol", "required": false, "localized": false }
   ]
 }

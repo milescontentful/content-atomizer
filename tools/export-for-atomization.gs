@@ -18,6 +18,33 @@
  *   npm run extract -- --deck personalization-q2fy27
  *   python pipeline/run.py --deck-id personalization-q2fy27 --dry-run
  *   python pipeline/run.py --deck-id personalization-q2fy27 --apply
+ *
+ * OUTPUT SHAPE PER SLIDE
+ * ----------------------
+ *   slideIndex, objectId, layoutName, slideType, title, subtitle?,
+ *   bodyText, bodyLines[]          ← flat text (back-compat with extract.ts)
+ *   shapes[]                       ← NEW: per-shape text + bounding box
+ *   imageRefs[]                    ← NEW: per-image geometry + altText
+ *   imageCount                     ← kept for back-compat (= imageRefs.length)
+ *   speakerNotes
+ *
+ * WHY shapes[] MATTERS
+ * --------------------
+ * Slides with stat cards store the number and its label in separate, visually
+ * adjacent shapes — e.g. "87%" in one box and "higher CTR for Ace & Tate" in
+ * another box to its right or below. Flattening all shapes into a single text
+ * list (bodyLines) loses the visual grouping, causing the transform to pair
+ * numbers with the wrong labels.
+ *
+ * shapes[] preserves per-shape geometry (top/left/width/height) so the
+ * transform can associate each number with its spatially nearest label rather
+ * than guessing by DOM order.
+ *
+ * NOTE ON contentUrl IN imageRefs
+ * --------------------------------
+ * image.getContentUrl() returns a short-lived (~1 hour) Google content URL.
+ * Download images immediately after export if needed. Persistent Drive URLs
+ * require the Drive API and are out of scope for this GAS script.
  */
 
 // ─── Entry point ──────────────────────────────────────────────────────────────
@@ -47,13 +74,9 @@ function exportForAtomization() {
     var notes = _getSpeakerNotes(slide);
     var subtitle = _getSlideSubtitle(slide);
 
-    var elements = slide.getPageElements();
-    var imageCount = 0;
-    for (var j = 0; j < elements.length; j++) {
-      if (elements[j].getPageElementType() === SlidesApp.PageElementType.IMAGE) {
-        imageCount++;
-      }
-    }
+    // ── NEW: geometry-aware shape and image data ──
+    var shapes = _getBodyShapes(slide, slideTitle);
+    var imageRefs = _getImageRefs(slide);
 
     var slideData = {
       slideIndex: slideIndex,
@@ -63,8 +86,10 @@ function exportForAtomization() {
       title: slideTitle,
       bodyText: bodyText,
       bodyLines: bodyLines,
-      speakerNotes: notes,
-      imageCount: imageCount
+      shapes: shapes,
+      imageRefs: imageRefs,
+      imageCount: imageRefs.length,
+      speakerNotes: notes
     };
 
     if (subtitle) slideData.subtitle = subtitle;
@@ -101,7 +126,98 @@ function exportForAtomization() {
   SlidesApp.getUi().showModalDialog(html, 'Atomization Export Complete');
 }
 
-// ─── Helpers (mapper functions, self-contained) ───────────────────────────────
+// ─── Geometry-aware shape extraction (NEW) ────────────────────────────────────
+
+/**
+ * Returns one entry per non-title/subtitle text shape, each with its bounding
+ * box and the lines it contains. Sorted top-to-bottom then left-to-right so
+ * visual reading order is preserved.
+ *
+ * This is the key data the transform uses to correctly pair stat numbers with
+ * their labels: shapes that share a horizontal band (similar top values) and
+ * similar left values are part of the same visual "card".
+ */
+function _getBodyShapes(slide, resolvedTitle) {
+  var skipTypes = [
+    SlidesApp.PlaceholderType.TITLE,
+    SlidesApp.PlaceholderType.CENTERED_TITLE,
+    SlidesApp.PlaceholderType.SUBTITLE
+  ];
+
+  var shapes = [];
+  var elements = slide.getPageElements();
+
+  for (var i = 0; i < elements.length; i++) {
+    var el = elements[i];
+    if (el.getPageElementType() !== SlidesApp.PageElementType.SHAPE) continue;
+    var shape = el.asShape();
+    if (skipTypes.indexOf(shape.getPlaceholderType()) !== -1) continue;
+
+    var rawLines = shape.getText().asString().split('\n');
+    var shapeLines = rawLines
+      .map(function(l) { return l.trim(); })
+      .filter(function(l) { return l && !_isNoiseLine(l); });
+
+    if (shapeLines.length === 0) continue;
+    // Skip single-line shapes that just repeat the slide title
+    if (resolvedTitle && shapeLines.length === 1 && _cleanText(shapeLines[0]) === resolvedTitle) continue;
+
+    shapes.push({
+      objectId: el.getObjectId(),
+      top:    Math.round(el.getTop()),
+      left:   Math.round(el.getLeft()),
+      width:  Math.round(el.getWidth()),
+      height: Math.round(el.getHeight()),
+      lines: shapeLines.map(function(l) {
+        return { text: _isBulletLine(l) ? _stripBullet(l) : l, isBullet: _isBulletLine(l) };
+      })
+    });
+  }
+
+  // Sort by visual reading order: top-to-bottom, then left-to-right
+  shapes.sort(function(a, b) {
+    return a.top !== b.top ? a.top - b.top : a.left - b.left;
+  });
+
+  return shapes;
+}
+
+/**
+ * Returns one entry per image element with bounding box and alt text.
+ * contentUrl is a short-lived URL (~1 hour) — download promptly if needed.
+ * Sorted top-to-bottom then left-to-right.
+ */
+function _getImageRefs(slide) {
+  var refs = [];
+  var elements = slide.getPageElements();
+
+  for (var i = 0; i < elements.length; i++) {
+    var el = elements[i];
+    if (el.getPageElementType() !== SlidesApp.PageElementType.IMAGE) continue;
+    var image = el.asImage();
+
+    var contentUrl = '';
+    try { contentUrl = image.getContentUrl(); } catch (e) {}
+
+    refs.push({
+      objectId:   el.getObjectId(),
+      top:        Math.round(el.getTop()),
+      left:       Math.round(el.getLeft()),
+      width:      Math.round(el.getWidth()),
+      height:     Math.round(el.getHeight()),
+      altText:    el.getDescription() || el.getTitle() || '',
+      contentUrl: contentUrl
+    });
+  }
+
+  refs.sort(function(a, b) {
+    return a.top !== b.top ? a.top - b.top : a.left - b.left;
+  });
+
+  return refs;
+}
+
+// ─── Existing helpers (unchanged for back-compat) ─────────────────────────────
 
 var _LAYOUT_TO_SLIDE_TYPE = {
   'TITLE':                          'title-slide',
