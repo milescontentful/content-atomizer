@@ -5,6 +5,7 @@
   "type": "module",
   "description": "Context-preserving content atomization POC for Meta — Google Slides -> governed Contentful atoms.",
   "scripts": {
+    "extract": "tsx pipeline/extract.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

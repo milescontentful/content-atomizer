@@ -1,0 +1,7 @@
+# Python dependencies for the pipeline stages (Transform + Load)
+# Install: pip install -r requirements.txt
+#
+# Python 3.11+ required (uses X | Y union syntax)
+
+# CMA client for the Load stage
+contentful-management>=2.0.0
