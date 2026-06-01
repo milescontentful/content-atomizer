@@ -15,7 +15,7 @@ Output matches the schema in model/contentAtom.json (corrected shape):
 """
 import json
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Optional, Tuple
 
 STAGING = Path(__file__).parent / "staging"
 
@@ -133,7 +133,7 @@ def transform_slide_llm(slide: dict, source_doc_id: str) -> dict:
 def run_transform(
     ir_path: str,
     deck_id: str,
-    slide_range: tuple[int, int] | None = None,
+    slide_range: Optional[Tuple[int, int]] = None,
     mode: Literal["coarse", "llm"] = "coarse",
 ) -> str:
     """Transform IR → atoms JSON.
@@ -168,7 +168,6 @@ def run_transform(
 
     out = {
         "sourceDocument": {
-            "atomKey": ir["sourceDocId"],
             "title": ir["title"],
             "sourceUrl": ir["sourceUrl"],
             "sourceDocId": ir["sourceDocId"],

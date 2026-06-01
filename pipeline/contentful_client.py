@@ -11,19 +11,27 @@ Environment variables (set in .env):
 """
 import os
 import hashlib
-from typing import Any
+from typing import Any, Optional
 
 import contentful_management  # pip install contentful-management
 
 DEFAULT_LOCALE = os.environ.get("CTFL_LOCALE", "en-US")
 
+# The unique identifier field for each content type (not always atomKey)
+_KEY_FIELD: dict = {
+    "contentAtom":    "atomKey",
+    "customer":       "atomKey",
+    "sourceDocument": "sourceDocId",
+    "projectContext": "contextKey",
+}
+
 
 class ContentfulClient:
     def __init__(
         self,
-        space_id: str | None = None,
-        environment_id: str | None = None,
-        cma_token: str | None = None,
+        space_id: Optional[str] = None,
+        environment_id: Optional[str] = None,
+        cma_token: Optional[str] = None,
         locale: str = DEFAULT_LOCALE,
     ):
         self.space_id = space_id or os.environ["CTFL_SPACE_ID"]
@@ -36,15 +44,19 @@ class ContentfulClient:
 
     # ── Helpers ──────────────────────────────────────────────────────────────
 
-    def _wrap(self, fields: dict[str, Any]) -> dict[str, Any]:
+    def _key_field(self, content_type: str) -> str:
+        return _KEY_FIELD.get(content_type, "atomKey")
+
+    def _wrap(self, fields: dict) -> dict:
         """Flat {fieldId: value} → CMA {fieldId: {locale: value}}, skipping None."""
         return {k: {self.locale: v} for k, v in fields.items() if v is not None}
 
-    def _find_by_atom_key(self, content_type: str, atom_key: str) -> Any | None:
-        """Return the first entry matching atomKey, or None."""
+    def _find_by_key(self, content_type: str, key_value: str) -> Optional[Any]:
+        """Return the first entry matching the type's unique key field, or None."""
+        field = self._key_field(content_type)
         entries = self._env.entries().all({
             "content_type": content_type,
-            "fields.atomKey": atom_key,
+            f"fields.{field}": key_value,
             "limit": 1,
         })
         return entries[0] if len(entries) else None
@@ -63,19 +75,20 @@ class ContentfulClient:
         self,
         content_type: str,
         key: str,
-        fields: dict[str, Any],
-    ) -> dict[str, Any]:
+        fields: dict,
+    ) -> dict:
         """Create or update an entry keyed on atomKey. Leaves it in DRAFT.
 
         Returns {"id", "action", "atomKey"} where action is "created" | "updated".
         """
-        fields = {**fields, "atomKey": key}
-        existing = self._find_by_atom_key(content_type, key)
+        key_field = self._key_field(content_type)
+        if key_field not in fields:
+            fields = {**fields, key_field: key}
+        existing = self._find_by_key(content_type, key)
         wrapped = self._wrap(fields)
 
         if existing is not None:
-            for field_id, locale_val in wrapped.items():
-                existing.fields[field_id] = locale_val
+            existing.raw["fields"] = wrapped
             existing.save()
             return {"id": existing.sys["id"], "action": "updated", "atomKey": key}
 
@@ -140,7 +153,7 @@ class ContentfulClient:
         asset.process()  # enqueue binary processing (does NOT publish)
         return {"id": asset.sys["id"], "action": "uploaded", "hash": content_hash}
 
-    def _find_asset_by_hash(self, content_hash: str) -> Any | None:
+    def _find_asset_by_hash(self, content_hash: str) -> Optional[Any]:
         """Look up an asset by its sha256 tag. Returns None if not found."""
         assets = self._env.assets().all({
             "metadata.tags.sys.id[in]": f"sha256-{content_hash}",

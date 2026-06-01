@@ -70,13 +70,41 @@ def build_manifest(atoms_path: str, deck_id: str) -> str:
     return str(out_path)
 
 
-def apply_manifest_cma(manifest_path: str, client: "ContentfulClient") -> list[dict]:
+# Fields that hold Entry links — values that match a manifest key get converted
+# to CMA link objects once we know the real Contentful entry ID.
+_LINK_FIELDS = {
+    "sourceDocument", "attributedTo", "proves", "illustrates", "contains", "appliesTo", "atoms"
+}
+
+
+def _resolve_links(fields: dict, key_to_id: dict) -> dict:
+    """Replace plain key strings in link fields with CMA link objects."""
+    resolved = {}
+    for field, value in fields.items():
+        if field not in _LINK_FIELDS:
+            resolved[field] = value
+            continue
+        if isinstance(value, str) and value in key_to_id:
+            resolved[field] = {"sys": {"type": "Link", "linkType": "Entry", "id": key_to_id[value]}}
+        elif isinstance(value, list):
+            resolved[field] = [
+                {"sys": {"type": "Link", "linkType": "Entry", "id": key_to_id[item]}}
+                if isinstance(item, str) and item in key_to_id else item
+                for item in value
+            ]
+        else:
+            resolved[field] = value
+    return resolved
+
+
+def apply_manifest_cma(manifest_path: str, client: "ContentfulClient") -> list:
     """Apply the manifest to Contentful via CMA. Idempotent; never publishes.
 
     Returns a list of operation results: [{op, key, id, action}].
     """
     manifest = json.loads(Path(manifest_path).read_text())
-    results: list[dict] = []
+    results = []
+    key_to_id: dict = {}  # manifest key → real Contentful entry ID (built as we go)
 
     for op in manifest["operations"]:
         if op["op"] == "uploadAsset":
@@ -87,11 +115,13 @@ def apply_manifest_cma(manifest_path: str, client: "ContentfulClient") -> list[d
             results.append({"op": "uploadAsset", "key": op["key"], **result})
 
         elif op["op"] == "upsert":
+            resolved = _resolve_links(op["fields"], key_to_id)
             result = client.upsert_entry(
                 content_type=op["contentType"],
                 key=op["key"],
-                fields=op["fields"],
+                fields=resolved,
             )
+            key_to_id[op["key"]] = result["id"]
             results.append({"op": "upsert", "key": op["key"], **result})
 
     return results
