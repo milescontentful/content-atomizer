@@ -54,9 +54,11 @@ from typing import Literal, Optional, Tuple
 STAGING = Path(__file__).parent / "staging"
 
 # Geometry thresholds for card-column grouping (points, Google Slides coordinate space).
-# A standard Slides canvas is 720×540pt; 3 equal columns → ~240pt wide each.
-# Shapes within COL_THRESHOLD horizontal distance share a "card column".
-COL_THRESHOLD = 100
+# Within a stat card, a number and its label are typically aligned within ~15pt.
+# Adjacent columns in a 3-column layout have gaps of 50–200pt.
+# 20pt is tight enough to separate neighbouring columns (observed min gap: 23pt)
+# while still grouping stat + label within the same card (max within-card offset: ~11pt).
+COL_THRESHOLD = 20
 
 # ─── LLM prompt (Phase 3) ────────────────────────────────────────────────────
 
